@@ -5,12 +5,18 @@ import (
 	"testing"
 
 	"github.com/go-oauth2/oauth2/v4/models"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestClientStore(t *testing.T) {
-	cstore := NewClientStore(NewConfig(dsn, dbType, ""))
+	db, err := gorm.Open(dbType, dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cstore := NewClientStoreWithDB(&Config{}, db)
 
 	Convey("Test client store", t, func() {
 		Convey("Test create client", func() {

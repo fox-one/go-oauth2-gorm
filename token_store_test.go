@@ -6,20 +6,26 @@ import (
 	"time"
 
 	"github.com/go-oauth2/oauth2/v4/models"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/sqlite"
 
 	. "github.com/smartystreets/goconvey/convey"
 )
 
 const (
-	dbType = SQLite
+	dbType = "sqlite3"
 	dsn    = "file::memory:?cache=shared"
 )
 
 func TestTokenStore(t *testing.T) {
 	// wait gc
 	defer time.Sleep(time.Second * 2)
+	db, err := gorm.Open(dbType, dsn)
+	if err != nil {
+		t.Fail()
+	}
 
-	store := NewTokenStore(NewConfig(dsn, dbType, ""), 1)
+	store := NewTokenStoreWithDB(&Config{}, db, 1)
 
 	Convey("Test token store", t, func() {
 		Convey("Test authorization code store", func() {

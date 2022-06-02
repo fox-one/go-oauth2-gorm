@@ -1,13 +1,13 @@
-module src.techknowlogick.com/oauth2-gorm
+module github.com/fox-one/go-oauth2-gorm
 
 require (
+	github.com/denisenkom/go-mssqldb v0.0.0-20200428022330-06a60b6afbbc // indirect
 	github.com/go-oauth2/oauth2/v4 v4.2.0
+	github.com/jinzhu/gorm v1.9.16
+	github.com/jinzhu/now v1.1.1 // indirect
+	github.com/lib/pq v1.3.0 // indirect
+	github.com/mattn/go-sqlite3 v1.14.3 // indirect
 	github.com/smartystreets/goconvey v1.6.4
-	gorm.io/driver/mysql v1.0.1
-	gorm.io/driver/postgres v1.0.1
-	gorm.io/driver/sqlite v1.1.3
-	gorm.io/driver/sqlserver v1.0.4
-	gorm.io/gorm v1.20.1
 )
 
 go 1.14

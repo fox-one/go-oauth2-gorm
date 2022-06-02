@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/models"
-	"gorm.io/gorm"
+	"github.com/jinzhu/gorm"
 )
 
 type TokenStoreItem struct {
@@ -21,44 +21,35 @@ type TokenStoreItem struct {
 	Access    string `gorm:"type:varchar(512)"`
 	Refresh   string `gorm:"type:varchar(512)"`
 	Data      string `gorm:"type:text"`
+
+	table string `gorm:"-"`
 }
 
-// NewStore create mysql store instance,
-func NewTokenStore(config *Config, gcInterval int) *TokenStore {
-
-	db, err := gorm.Open(config.Dialector, defaultConfig)
-	if err != nil {
-		panic(err)
+func (p TokenStoreItem) TableName() string {
+	if p.table != "" {
+		return p.table
 	}
-	// default client pool
-	s, err := db.DB()
-	if err != nil {
-		panic(err)
-	}
-	s.SetMaxIdleConns(10)
-	s.SetMaxOpenConns(100)
-	s.SetConnMaxLifetime(time.Hour)
 
-	return NewTokenStoreWithDB(config, db, gcInterval)
+	return "oauth2_token"
 }
 
 func NewTokenStoreWithDB(config *Config, db *gorm.DB, gcInterval int) *TokenStore {
 	store := &TokenStore{
-		db:        db,
-		tableName: "oauth2_token",
-		stdout:    os.Stderr,
+		db:     db,
+		stdout: os.Stderr,
 	}
-	if config.TableName != "" {
-		store.tableName = config.TableName
-	}
+
+	tsi := &TokenStoreItem{table: config.TableName}
+	store.tableName = tsi.TableName()
+
 	interval := 600
 	if gcInterval > 0 {
 		interval = gcInterval
 	}
 	store.ticker = time.NewTicker(time.Second * time.Duration(interval))
 
-	if !db.Migrator().HasTable(store.tableName) {
-		if err := db.Table(store.tableName).Migrator().CreateTable(&TokenStoreItem{}); err != nil {
+	if !db.HasTable(store.tableName) {
+		if err := db.CreateTable(&TokenStoreItem{}).Error; err != nil {
 			panic(err)
 		}
 	}
@@ -133,12 +124,12 @@ func (s *TokenStore) Create(ctx context.Context, info oauth2.TokenInfo) error {
 		}
 	}
 
-	return s.db.WithContext(ctx).Table(s.tableName).Create(item).Error
+	return s.db.Table(s.tableName).Create(item).Error
 }
 
 // RemoveByCode delete the authorization code
 func (s *TokenStore) RemoveByCode(ctx context.Context, code string) error {
-	return s.db.WithContext(ctx).
+	return s.db.
 		Table(s.tableName).
 		Where("code = ?", code).
 		Update("code", "").
@@ -147,7 +138,7 @@ func (s *TokenStore) RemoveByCode(ctx context.Context, code string) error {
 
 // RemoveByAccess use the access token to delete the token information
 func (s *TokenStore) RemoveByAccess(ctx context.Context, access string) error {
-	return s.db.WithContext(ctx).
+	return s.db.
 		Table(s.tableName).
 		Where("access = ?", access).
 		Update("access", "").
@@ -156,7 +147,7 @@ func (s *TokenStore) RemoveByAccess(ctx context.Context, access string) error {
 
 // RemoveByRefresh use the refresh token to delete the token information
 func (s *TokenStore) RemoveByRefresh(ctx context.Context, refresh string) error {
-	return s.db.WithContext(ctx).
+	return s.db.
 		Table(s.tableName).
 		Where("refresh = ?", refresh).
 		Update("refresh", "").
@@ -179,10 +170,10 @@ func (s *TokenStore) GetByCode(ctx context.Context, code string) (oauth2.TokenIn
 	}
 
 	var item TokenStoreItem
-	if err := s.db.WithContext(ctx).
+	if err := s.db.
 		Table(s.tableName).
 		Where("code = ?", code).
-		Find(&item).Error; err != nil {
+		Find(&item).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
 	if item.ID == 0 {
@@ -199,10 +190,10 @@ func (s *TokenStore) GetByAccess(ctx context.Context, access string) (oauth2.Tok
 	}
 
 	var item TokenStoreItem
-	if err := s.db.WithContext(ctx).
+	if err := s.db.
 		Table(s.tableName).
 		Where("access = ?", access).
-		Find(&item).Error; err != nil {
+		Find(&item).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
 	if item.ID == 0 {
@@ -219,10 +210,10 @@ func (s *TokenStore) GetByRefresh(ctx context.Context, refresh string) (oauth2.T
 	}
 
 	var item TokenStoreItem
-	if err := s.db.WithContext(ctx).
+	if err := s.db.
 		Table(s.tableName).
 		Where("refresh = ?", refresh).
-		Find(&item).Error; err != nil {
+		Find(&item).Error; err != nil && !gorm.IsRecordNotFoundError(err) {
 		return nil, err
 	}
 	if item.ID == 0 {

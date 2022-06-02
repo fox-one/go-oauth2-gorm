@@ -9,7 +9,7 @@ import (
 
 	"github.com/go-oauth2/oauth2/v4"
 	"github.com/go-oauth2/oauth2/v4/models"
-	"gorm.io/gorm"
+	"github.com/jinzhu/gorm"
 )
 
 type ClientStoreItem struct {
@@ -19,38 +19,30 @@ type ClientStoreItem struct {
 	Data      string `gorm:"type:text"`
 	CreatedAt time.Time
 	UpdatedAt time.Time
-	DeletedAt gorm.DeletedAt `gorm:"index"`
+	DeletedAt *time.Time `sql:"index"`
+
+	table string `gorm:"-"`
 }
 
-func NewClientStore(config *Config) *ClientStore {
-	db, err := gorm.Open(config.Dialector, defaultConfig)
-	if err != nil {
-		panic(err)
+func (p ClientStoreItem) TableName() string {
+	if p.table != "" {
+		return p.table
 	}
-	// default client pool
-	s, err := db.DB()
-	if err != nil {
-		panic(err)
-	}
-	s.SetMaxIdleConns(10)
-	s.SetMaxOpenConns(100)
-	s.SetConnMaxLifetime(time.Hour)
 
-	return NewClientStoreWithDB(config, db)
+	return "oauth2_clients"
 }
 
 func NewClientStoreWithDB(config *Config, db *gorm.DB) *ClientStore {
 	store := &ClientStore{
-		db:        db,
-		tableName: "oauth2_clients",
-		stdout:    os.Stderr,
-	}
-	if config.TableName != "" {
-		store.tableName = config.TableName
+		db:     db,
+		stdout: os.Stderr,
 	}
 
-	if !db.Migrator().HasTable(store.tableName) {
-		if err := db.Table(store.tableName).Migrator().CreateTable(&ClientStoreItem{}); err != nil {
+	csi := &ClientStoreItem{table: config.TableName}
+	store.tableName = csi.TableName()
+
+	if !db.HasTable(store.tableName) {
+		if err := db.CreateTable(csi).Error; err != nil {
 			panic(err)
 		}
 	}
@@ -76,7 +68,7 @@ func (s *ClientStore) GetByID(ctx context.Context, id string) (oauth2.ClientInfo
 	}
 
 	var item ClientStoreItem
-	err := s.db.WithContext(ctx).Table(s.tableName).Limit(1).Find(&item, "id = ?", id).Error
+	err := s.db.Table(s.tableName).Limit(1).Find(&item, "id = ?", id).Error
 	if err != nil {
 		return nil, err
 	}
@@ -96,5 +88,5 @@ func (s *ClientStore) Create(ctx context.Context, info oauth2.ClientInfo) error 
 		Data:   string(data),
 	}
 
-	return s.db.WithContext(ctx).Table(s.tableName).Create(item).Error
+	return s.db.Table(s.tableName).Create(item).Error
 }
